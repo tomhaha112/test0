@@ -1,0 +1,332 @@
+/**
+ * Created by Pactera on 2015/11/7.
+ */
+define(['zepto', 'common', 'viewcontroller', 'model', 'routesUtil','dateUtil','pluginsUtil'/*,'cordova'*/], function($, common, controller, model, routesUtil,dateUtil,pluginsUtil/*,cordova */ ) {
+
+    var mainView = $.extendCls(controller, {
+        services: null,
+
+        html:'<div id="container"><header  class="boc-red"><img src="images/back.png" class="boc-red-icon" def_event="{click:\'goback\'}"/><span class="boc-red-name" nls="ovs_bpa_hbi_queryresults"></span></header><div class="content" id="mycontent"><ul><li><div class="conIput" def_event="{click:\'showDatePicker\'}"><span  class="conIput-text"><a class="date"></a><img src = "images/hisarrow.png" class="hisarrow"></span></div></li></ul></div><div class="h_content"><h3 id="his_detail_amount" class="his_detail_amount"><label nls="ovs_bpa_hbi_total" ></label><label id="mynum"></label><label nls="ovs_bpa_hbi_item" ></label></h3></div></div>',
+        pageparams:null,
+
+
+        //日期选择
+        //原生日期控件调用
+        showDatePicker:function(){
+            var _t = this;
+            var a = $(".h_content");
+
+            a.empty();
+            a.append('<h3 id="his_detail_amount" class="his_detail_amount"><label nls="ovs_bpa_hbi_total" ></label><label id="mynum">' +
+                '</label><label nls="ovs_bpa_hbi_item" ></label></h3>');
+
+
+
+
+            /*param.testdata1 = "params.start";
+             param.testdata2 = "params.end";*/
+            var dateparams = "";
+            model.interaction({
+                    method: routesUtil.method.BII.OvcSysTimeQry,
+                    params: {}
+                }, "BII", function(data) {
+
+                var dateMin = "";
+                var dateMax = "";
+                if (data.sysTime != "" && data.sysTime != null) {
+                    var sysDate = dateUtil.parse(data.sysTime, 'yyyy/MM/dd');
+                    console.log(sysDate);
+
+                    var tempdate = dateUtil.addDays(sysDate, 1);
+                    dateMin = dateUtil.addMonths(tempdate, -3);
+                    dateMax = dateUtil.addDays(sysDate, -1);
+                    dateparams = pluginsUtil.createLimitDataSelectParams(data.sysTime, {
+                        min: dateUtil.format(dateMin, "yyyy/MM/dd"),
+                        max: dateUtil.format(dateMax, "yyyy/MM/dd"),
+                        mindef: dateUtil.format(dateMin, "yyyy/MM/dd"),
+                        maxdef: dateUtil.format(dateMax, "yyyy/MM/dd")
+                    });
+                    console.log(dateMin + "sdfsf" + dateMax);
+                    console.log(params);
+                }
+                else {
+                    var date = new Date();
+                    var sysDate = dateUtil.parse(date, 'yyyy/MM/dd');
+                    dateMin = dateUtil.addMonths(dateUtil.addDays(sysDate, 1), -3);
+                    dateMax = dateUtil.addDays(sysDate, -1);
+                    dateparams = pluginsUtil.createLimitDataSelectParams(sysDate, {
+                        min: dateUtil.format(dateMin, "yyyy/MM/dd"),
+                        max: dateUtil.format(dateMax, "yyyy/MM/dd"),
+                        mindef: dateUtil.format(dateMin, "yyyy/MM/dd"),
+                        maxdef: dateUtil.format(dateMax, "yyyy/MM/dd")
+                    });
+                }
+
+            })
+            bocovsbridge.showDatePicker(function(params){
+
+                $('.date').text(params.start+"--"+params.end);
+                param.testdata1 = params.start;
+                param.testdata2 = params.end;
+                var pageparams = {
+                        currentIndex: 0,
+                        pageSize: 8,
+                        startDate:params.start,
+                        endDate:params.end,
+
+                        _refresh: "false"
+                    };
+                model.interaction({//先拿到先拿到conversationId
+                    method: routesUtil.method.BII.OvcCreConversation,
+                    loadingMask: _t.loading,//页面第一次加载loading显示
+                    params: {}
+                }, "BII", function(data) {
+
+                    pageparams.conversationId = data.conversationId;
+
+
+                    model.interaction({
+                        method: routesUtil.method.BII.OvpBpayHistoryQry,
+                        loadingMask: true,//页面第一次加载loading显示
+                        params: pageparams
+                    }, "BII", function (data) {
+
+                        _t.data = data.recordNumber;
+                        _t.resultData = data.billerHistoryList;
+                        console.log(_t.resultData.length);
+                        $("#mynum").text(" "+_t.resultData.length+" ");
+                        var start = _t.resultData.length - data.recordNumber;
+                        var end = _t.resultData.length - 1;
+                        console.log(start);
+                        var writedate = {billerHistoryList: _t.resultData, start: start, end: end};
+
+                        console.log(end);
+                        console.log(writedate);
+                        console.log(writedate.billerHistoryList[0].receiptNum);
+                        //_billerBookList = $.extend(_billerBookList, data.list);
+
+                        _t.append(_t.domNode.find('.h_content'), new EJS({
+                            url: '../BocAbroad/views/bpay/aud/AudQueryHistoryList/queryHistoryList.ejs'
+                        }).render({data: writedate}));
+                    });})
+
+
+            }, function(params){
+            },dateparams);
+        },
+
+        _showhisDetail: function(e) {
+            var clickobj = $(e.target);
+            while (clickobj.length > 0 && !clickobj.hasClass('boc-list')) {
+                clickobj = clickobj.parent();
+
+            }
+            console.log(this.resultData);
+            var curBillerCode = clickobj.attr("hislistid");
+            var nav = $(".nav");
+            nav.hide();
+            var rec = $(".record1");
+            //rec.hide();
+             rec.css('visibility', 'hidden');
+
+    console.log(curBillerCode);
+
+            var hisdetail = this.resultData[curBillerCode];
+            console.log(hisdetail);
+
+
+            common.fullLayer.show({
+                view: new ($.extendCls(controller, {
+                    ejs: "../BocAbroad/views/bpay/aud/AudQueryHistoryList/showHistoryDetail.ejs"
+                }))({
+                    id: 'hisdetailView',
+
+                    data:[hisdetail, {status:(hisdetail.status=='0')?'Payment&nbsp&nbspfailed':'Payment&nbsp&nbspsuccess'}],
+                    _hisClose: function(e){
+                        common.fullLayer.close(e);
+                        nav.show();
+                        rec.css('visibility', 'visible');
+
+
+                    }
+
+
+                })
+            });
+
+
+
+
+        },
+        /*
+         历史列表页面，点击返回，跳转选择查询时间页面
+
+         */
+        goback:function(){
+            bocovsbridge.navigateToPage(function(params){
+            }, function(params){
+            }, 'back');
+
+
+        },
+
+
+        onSubError: function(err) {
+
+        },
+        serviceFormParams: function() {
+            return {};
+        },
+        onLoadFinish: function(data) {
+
+            var  loading = true;
+            console.log(loading);
+            var _t = this;
+            _t.resultData = [];
+            _t.domNode.find('.h_content').css('height', ($(window).height()-64) + 'px');
+
+            console.log("++++++++++++i++++++++++");
+            //console.log(hisdata);
+            //得到系统时间
+            model.interaction({
+                method: routesUtil.method.BII.OvcSysTimeQry,
+                params: {}
+            }, "BII", function(data) {
+                _t.sysTime = data.sysTime;
+                var sysDate = dateUtil.parse(_t.sysTime, 'yyyy/MM/dd');
+
+                var tempdate = dateUtil.addDays(sysDate, 1);
+
+                var  dateMin = dateUtil.addMonths(tempdate, -3);
+
+                var  dateMax = dateUtil.addDays(sysDate, -1);
+
+
+                $('.date').text(dateUtil.format(dateMin,"yyyy/MM/dd")+" - "+dateUtil.format(dateMax,"yyyy/MM/dd"));
+
+            });
+
+
+            new common.ScrollPagination({
+                pageSize: 8,
+
+                el: _t.domNode.find('.h_content'),
+                getPageData: function(pageSize, currentPage, startIdx, endIdx, callback) {
+                    var p = this;
+                    model.interaction({//先拿到conversationId
+                        method: routesUtil.method.BII.OvcCreConversation,
+                        loadingMask: loading,//页面第一次加载loading显示
+                        params: {}
+                    }, "BII", function(data) {
+
+                        loading = false;
+
+                        p.removeTip();
+                        var  conversationId = data.conversationId;
+                        console.log("@@@@@@@@@@@@@@@@@@@");
+
+
+
+//
+                     pageparams = {
+                        currentIndex: 0,
+                        pageSize: pageSize,
+                        startDate:"2015/11/12",
+                        endDate:"2015/11/21",
+                         conversationId:conversationId,
+                        _refresh: "false"
+                    };
+
+
+
+
+                        model.interaction({
+                            method: routesUtil.method.BII.OvpBpayHistoryQry,
+                            loadingMask: loading,//页面第一次加载loading显示
+                            params: pageparams
+                        }, "BII", function (data) {
+                            console.log(loading);
+
+                            _t.data = data.recordNumber;
+                            _t.resultData = _t.resultData.concat(data.billerHistoryList);
+                            console.log(_t.resultData.length);
+                            $("#mynum").text("  "+_t.resultData.length+"  ");
+                            var start = _t.resultData.length - data.recordNumber;
+                            var end = _t.resultData.length - 1;
+                            console.log(start);
+                            var writedate = {billerHistoryList: _t.resultData, start: start, end: end};
+
+                            console.log(end);
+                            console.log(writedate);
+                            console.log(writedate.billerHistoryList[0].receiptNum);
+                            //_billerBookList = $.extend(_billerBookList, data.list);
+
+                            _t.append(_t.domNode.find('.h_content'), new EJS({
+                                url: '../BocAbroad/views/bpay/aud/AudQueryHistoryList/queryHistoryList.ejs'
+                            }).render({data: writedate}));
+                        });
+                        });
+
+
+
+                }
+            });
+
+        },
+
+        //执行方式
+        onChoice: function() {
+
+        },
+        destroy: function() {
+            $.proxy(this.baseprototype.destroy, this)();
+        }
+    });
+
+    return common.Module.sub({
+        _constructor: function() {
+
+            this.mainView = null;
+            $.proxy(this.baseprototype._constructor, this)();
+        },
+        CSSPATH:['../BocAbroad/styles/detail.css','../BocAbroad/styles/selhistim.css'],
+        init: function() {
+           this.mainView = new mainView({
+              id: "historylistview",
+              el: "#loginViewWrap",
+                eloper: "html",
+                //参数
+                data: {
+                   loading: true
+               }
+           });
+           this.mainView.load();
+
+        },
+        initdata:function(data){
+
+            //this.mainView = new mainView({
+            //    id: "historylistview",
+            //    el: "#loginViewWrap",
+            //    eloper: "html",
+            //    //参数
+            //    data:data,
+            //
+            //
+            //});
+
+            /*this.mainView.load(
+                hisdata = data
+            );*/
+
+            // hisdata = data;
+            //console.log(hisdata);
+
+
+
+        },
+        destroy: function() {
+            this.mainView.destroy();
+        }
+    });
+});
